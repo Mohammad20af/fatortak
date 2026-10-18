@@ -14,6 +14,8 @@ import {
   PeriodFields,
 } from "../../components/UI";
 import FinancialStats from "../../components/FinancialStats";
+import { ValuationNotice } from "../../components/CurrencyControls";
+import { downloadCsv } from "../../utils/export";
 export default function ReportsPage() {
   const { periodLabel, money } = useFormat();
   const { t } = useI18n();
@@ -48,6 +50,41 @@ export default function ReportsPage() {
       <LoadState state={state}>
         {data && (
           <>
+            <ValuationNotice valuation={data.valuation} />
+            <button
+              className="button secondary export-button"
+              onClick={() =>
+                downloadCsv(`fatortak-${period.year}-${period.month}.csv`, [
+                  [
+                    t("Metric"),
+                    t("Amount"),
+                    t("Display currency"),
+                    t("Reference rate"),
+                    t("Reference date"),
+                    t("Checked"),
+                    t("Complete"),
+                  ],
+                  ...[
+                    "revenue",
+                    "purchaseCost",
+                    "operatingExpenses",
+                    "profit",
+                    "accountsReceivable",
+                    "accountsPayable",
+                  ].map((key) => [
+                    t(key),
+                    data[key] ?? t("Not available"),
+                    data.valuation.currency,
+                    data.valuation.exchangeRate?.rate || "",
+                    data.valuation.exchangeRate?.rateDate || "",
+                    data.valuation.exchangeRate?.fetchedAt || "",
+                    data.valuation.complete,
+                  ]),
+                ])
+              }
+            >
+              {t("Export CSV")}
+            </button>
             <FinancialStats data={data} currency={currency} />
             <div className="dashboard-grid">
               <section className="panel">
@@ -67,7 +104,7 @@ export default function ReportsPage() {
                         {data.invoices.map((item) => (
                           <tr key={`${item.type}-${item.status}`}>
                             <td className="capitalize primary-cell">
-                          {t(item.type)}
+                              {t(item.type)}
                             </td>
                             <td>
                               <Badge status={item.status} />

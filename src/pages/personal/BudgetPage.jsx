@@ -4,6 +4,8 @@ import { useCallback, useState } from "react";
 import { personalApi } from "../../api/personalApi";
 import useLoad from "../../utils/useLoad";
 import { currentPeriod } from "../../utils/format";
+import { useCurrency } from "../../context/currency";
+import { ValuationNotice } from "../../components/CurrencyControls";
 import {
   Field,
   LoadState,
@@ -14,6 +16,8 @@ import {
   StatCard,
 } from "../../components/UI";
 function BudgetEditor({ period, budget, reload }) {
+  const { currency: displayCurrency } = useCurrency();
+  const [currency, setCurrency] = useState(budget?.currency || displayCurrency);
   const { money, periodLabel } = useFormat();
   const { t } = useI18n();
   const [amount, setAmount] = useState(budget?.amount ?? "");
@@ -28,6 +32,7 @@ function BudgetEditor({ period, budget, reload }) {
       await personalApi.saveBudget({
         ...period,
         amount: Number(amount),
+        currency,
       });
       reload("Budget saved successfully.");
     } catch (err) {
@@ -54,10 +59,11 @@ function BudgetEditor({ period, budget, reload }) {
   }
   return (
     <>
+      <ValuationNotice valuation={budget?.valuation} />
       <div className="stats-grid three">
         <StatCard
           label={t("Monthly budget")}
-          value={money(budget?.amount)}
+          value={money(budget?.displayAmount)}
           hint={periodLabel(period)}
           accent
         />
@@ -79,11 +85,20 @@ function BudgetEditor({ period, budget, reload }) {
       <div className="panel narrow">
         <h2>{budget ? t("Update your plan") : t("Set your first budget")}</h2>
         <p className="muted">
-          {t('Choose a spending limit for {period}. Amounts are in USD.', { period: periodLabel(period) })}
+          {t("Choose a spending limit for {period}.", {
+            period: periodLabel(period),
+          })}
         </p>
         <Notice {...feedback} />
         <form onSubmit={submit}>
           <fieldset disabled={busy}>
+            <Field
+              label={t("Original currency")}
+              options={["USD", "ILS"]}
+              value={currency}
+              disabled={Boolean(budget)}
+              onChange={setCurrency}
+            />
             <Field
               label={t("Budget amount")}
               type="number"
@@ -94,7 +109,10 @@ function BudgetEditor({ period, budget, reload }) {
               onChange={setAmount}
             />
             <div className="form-actions">
-              <button className="button">
+              <button
+                className="button"
+                disabled={Boolean(budget && !budget.currency)}
+              >
                 {busy ? t("Saving\u2026") : t("Save budget")}
               </button>
               {budget && (
@@ -117,7 +135,10 @@ function BudgetEditor({ period, budget, reload }) {
           busy={busy}
         >
           <p>
-            {t('This removes the budget for {period}. Your expenses will remain.', { period: periodLabel(period) })}
+            {t(
+              "This removes the budget for {period}. Your expenses will remain.",
+              { period: periodLabel(period) },
+            )}
           </p>
           <div className="form-actions">
             <button
@@ -152,7 +173,8 @@ export default function BudgetPage() {
     },
     [period],
   );
-  const state = useLoad(loader);
+  // A background rate poll must not discard an unsaved budget draft.
+  const state = useLoad(loader, { refreshOnRates: false });
   return (
     <>
       <PageHeader

@@ -14,6 +14,23 @@ dist-ssr
 .env
 playwright-report
 test-results
+.implementation
+.npm-cache/
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+.aws/
+build/
+coverage/
+backups/
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+/-files*
 
 # Editor directories and files
 .vscode/*

@@ -1,60 +1,88 @@
 import { useEffect, useState } from "react";
 import { authApi } from "../api/authApi";
-import { tokenStorage } from "../api/api";
+import { initializeCsrf, clearCsrf, setDisplayCurrency } from "../api/api";
 import { AuthContext } from "./auth";
 export default function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [attempt, setAttempt] = useState(0);
-  const [notice, setNotice] = useState("");
+  const [user, setUser] = useState(null),
+    [loading, setLoading] = useState(true),
+    [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0),
+    [notice, setNotice] = useState("");
   useEffect(() => {
+    // One-time cleanup of the old authentication mechanism; tokens are never read.
+    try {
+      localStorage.removeItem("fatortak.token");
+      sessionStorage.removeItem("fatortak.token");
+    } catch {
+      /* Storage may be disabled. */
+    }
     const controller = new AbortController();
-    async function restoreSession() {
+    async function restore() {
       setLoading(true);
       setError("");
       try {
-        if (tokenStorage.get()) setUser(await authApi.me(controller.signal));
+        await initializeCsrf();
+        const restored = await authApi.me(controller.signal);
+        if (!controller.signal.aborted) {
+          setDisplayCurrency(restored.preferredCurrency || "USD");
+          setUser(restored);
+        }
       } catch (err) {
         if (!controller.signal.aborted && err.status !== 401) setError(err);
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
     }
-    restoreSession();
+    restore();
     return () => controller.abort();
   }, [attempt]);
   useEffect(() => {
     const expire = () => {
-      tokenStorage.clear();
+      clearCsrf();
       setUser(null);
       setError("");
       setNotice("Your session expired. Please sign in again.");
     };
-    const sync = (event) => {
-      if (event.key === "fatortak.token") {
+    const channel =
+      typeof BroadcastChannel !== "undefined"
+        ? new BroadcastChannel("fatortak.session")
+        : null;
+    if (channel)
+      channel.onmessage = () => {
         setUser(null);
         setAttempt((value) => value + 1);
-      }
-    };
+      };
     window.addEventListener("fatortak:unauthorized", expire);
-    window.addEventListener("storage", sync);
     return () => {
       window.removeEventListener("fatortak:unauthorized", expire);
-      window.removeEventListener("storage", sync);
+      channel?.close();
     };
   }, []);
+  function broadcast() {
+    if (typeof BroadcastChannel !== "undefined") {
+      const channel = new BroadcastChannel("fatortak.session");
+      channel.postMessage("changed");
+      channel.close();
+    }
+  }
   function authenticate(data) {
-    tokenStorage.set(data.token);
+    setDisplayCurrency(data.user.preferredCurrency || "USD");
     setUser(data.user);
     setNotice("");
     setError("");
+    broadcast();
   }
-  function logout() {
-    tokenStorage.clear();
-    setUser(null);
-    setError("");
-    setNotice("You have signed out.");
+  async function logout() {
+    try {
+      await authApi.logout();
+      clearCsrf();
+      setUser(null);
+      setError("");
+      setNotice("You have signed out.");
+      broadcast();
+    } catch (err) {
+      setError(err);
+    }
   }
   return (
     <AuthContext.Provider

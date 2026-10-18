@@ -20,6 +20,11 @@ export function Loading() {
     <div className="loading" role="status">
       <span className="spinner" />
       {t("Loading your workspace\u2026")}
+      <div className="skeleton-grid" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </div>
     </div>
   );
 }

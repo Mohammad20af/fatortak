@@ -30,6 +30,7 @@ const fields = [
   {
     name: "currency",
     label: "Currency code",
+    options: ["USD", "ILS"],
     required: true,
     minLength: 3,
     maxLength: 3,
@@ -115,7 +116,7 @@ function ProfileForm({ profile }) {
           </div>
           <p className="field-help">
             {t(
-              "Currency controls how amounts are displayed. Changing it does not convert existing amounts.",
+              "Use the header to choose your display currency. Each transaction keeps its original currency.",
             )}
           </p>
           <div className="form-actions">
@@ -138,7 +139,7 @@ export default function ProfilePage() {
       throw err;
     }
   }, []);
-  const state = useLoad(loader);
+  const state = useLoad(loader, { refreshOnRates: false });
   return (
     <>
       <PageHeader

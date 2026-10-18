@@ -1,11 +1,14 @@
 import { useI18n } from "../i18n/context";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/auth";
-import { businessApi } from "../api/businessApi";
-import useLoad from "../utils/useLoad";
+import CurrencyProvider from "../context/CurrencyProvider";
+import { useCurrency } from "../context/currency";
+import CurrencyControls, { RateNotice } from "../components/CurrencyControls";
+import ThemeToggle from "../components/ThemeToggle";
+import NavIcon from "../components/NavIcon";
 import { Notice } from "../components/UI";
-import LanguageSwitcher from '../i18n/LanguageSwitcher';
+import LanguageSwitcher from "../i18n/LanguageSwitcher";
 const personalLinks = [
   ["dashboard", "Overview", "◫"],
   ["expenses", "Expenses", "↗"],
@@ -22,24 +25,19 @@ const businessLinks = [
   ["profile", "Business profile", "◇"],
 ];
 export default function DashboardLayout() {
+  return (
+    <CurrencyProvider>
+      <WorkspaceLayout />
+    </CurrencyProvider>
+  );
+}
+function WorkspaceLayout() {
   const { t } = useI18n();
-  const { user, logout } = useAuth();
+  const { user, logout, error } = useAuth();
+  const { currency, error: currencyError } = useCurrency();
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const business = user.accountType === "business";
-  const loadProfile = useCallback(
-    async (signal) => {
-      if (!business) return null;
-      try {
-        return await businessApi.profile(signal);
-      } catch (err) {
-        if (err.status === 404) return null;
-        throw err;
-      }
-    },
-    [business],
-  );
-  const profile = useLoad(loadProfile);
   const links = business ? businessLinks : personalLinks;
   const active =
     links.find(([path]) => location.pathname.includes(`/${path}`))?.[1] ||
@@ -74,13 +72,13 @@ export default function DashboardLayout() {
         </div>
         <p className="nav-caption">{t("WORKSPACE")}</p>
         <nav aria-label={t("Main navigation")}>
-          {links.map(([path, label, icon]) => (
+          {links.map(([path, label]) => (
             <NavLink
               key={path}
               to={`/${user.accountType}/${path}`}
               onClick={() => setOpen(false)}
             >
-              <span className="direction-icon" aria-hidden="true">{icon}</span>
+              <NavIcon name={path} />
               {t(label)}
             </NavLink>
           ))}
@@ -119,28 +117,27 @@ export default function DashboardLayout() {
             <strong>{t(active)}</strong>
           </div>
           <div className="user-chip">
+            <CurrencyControls />
+            <ThemeToggle />
             <LanguageSwitcher />
             <div className="avatar">{user.name.slice(0, 1).toUpperCase()}</div>
             <div>
-              <strong><bdi>{user.name}</bdi></strong>
-              <small>{t(business ? 'Business account' : 'Personal account')}</small>
+              <strong>
+                <bdi>{user.name}</bdi>
+              </strong>
+              <small>
+                {t(business ? "Business account" : "Personal account")}
+              </small>
             </div>
           </div>
         </header>
         <main className="main-content">
-          {profile.error && (
-            <>
-              <p>{t('Business currency could not be loaded. Amounts temporarily use USD.')}</p>
-              <Notice error={profile.error} />
-              <button className="text-button" onClick={profile.reload}>
-                {t("Retry profile")}
-              </button>
-            </>
-          )}
+          <Notice error={error || currencyError} />
+          <RateNotice />
           <Outlet
             context={{
-              currency: profile.data?.currency || "USD",
-              refreshProfile: profile.reload,
+              currency,
+              refreshProfile: () => {},
             }}
           />
         </main>

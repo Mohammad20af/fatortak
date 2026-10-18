@@ -414,6 +414,71 @@ for (const [resource, arabic] of Object.entries({
 }))
   ar[`${resource} not found`] = `لم يتم العثور على ${arabic}`;
 
+Object.assign(ar, {
+  Customer: "العميل",
+  Supplier: "المورد",
+  "Display currency": "عملة العرض",
+  "Original currency": "العملة الأصلية",
+  "Reference rate": "السعر المرجعي",
+  "Reference date": "تاريخ السعر",
+  Checked: "آخر تحقق",
+  "Refresh rates": "تحديث الأسعار",
+  "Loading exchange rates…": "جارٍ تحميل أسعار الصرف…",
+  "Exchange rates unavailable. Original amounts are preserved; conversions are withheld.":
+    "أسعار الصرف غير متاحة. المبالغ الأصلية محفوظة ولا تُعرض التحويلات.",
+  "Totals are incomplete and unavailable amounts are withheld.":
+    "الإجماليات غير مكتملة، ولا تُعرض المبالغ التي يتعذر حسابها.",
+  "{count} records need verified currencies.":
+    "تحتاج عملة {count} من السجلات إلى التحقق.",
+  "{count} conversions are unavailable.": "يتعذر تحويل {count} من المبالغ.",
+  "Currency unverified": "العملة غير مؤكدة",
+  "Conversion unavailable": "التحويل غير متاح",
+  "Not available": "غير متاح",
+  "Dark mode": "الوضع الداكن",
+  "Light mode": "الوضع الفاتح",
+  Previous: "السابق",
+  Next: "التالي",
+  "Page {page}": "الصفحة {page}",
+  "Daily spending trend": "اتجاه الإنفاق اليومي",
+  "Select a day to inspect spending": "اختر يومًا لعرض الإنفاق",
+  "Current password": "كلمة المرور الحالية",
+  "New password": "كلمة المرور الجديدة",
+  "Required when changing your email or password.":
+    "مطلوبة عند تغيير البريد الإلكتروني أو كلمة المرور.",
+  "Use 12 or more characters, up to 72 UTF-8 bytes.":
+    "استخدم 12 حرفًا على الأقل وبحد أقصى 72 بايت.",
+  "Choose a spending limit for {period}.": "اختر حدًا للإنفاق لشهر {period}.",
+  "Use the header to choose your display currency. Each transaction keeps its original currency.":
+    "اختر عملة العرض من أعلى الصفحة. تحتفظ كل معاملة بعملتها الأصلية.",
+  "Export CSV": "تصدير CSV",
+  Metric: "المؤشر",
+  Complete: "مكتمل",
+  revenue: "الإيرادات",
+  purchaseCost: "تكلفة المشتريات",
+  operatingExpenses: "المصروفات التشغيلية",
+  profit: "الربح",
+  accountsReceivable: "المستحقات لنا",
+  accountsPayable: "المستحقات علينا",
+  "Security check failed. Please try again.":
+    "تعذر التحقق الأمني. يرجى المحاولة مجددًا.",
+  "Too many requests. Please try again later.":
+    "طلبات كثيرة. يرجى المحاولة لاحقًا.",
+  "Too many sign-in attempts. Please try again later.":
+    "محاولات تسجيل دخول كثيرة. يرجى المحاولة لاحقًا.",
+  "Unable to create account with these details.":
+    "تعذر إنشاء حساب بهذه البيانات.",
+  "Current password is required": "كلمة المرور الحالية مطلوبة",
+  "Current password is incorrect": "كلمة المرور الحالية غير صحيحة",
+  "Original currency cannot be changed": "لا يمكن تغيير العملة الأصلية",
+  "Legacy currency requires an evidence-backed migration":
+    "تتطلب عملة السجل القديم ترحيلًا يستند إلى دليل",
+  "Unverified records require a reviewed currency migration before editing financial values.":
+    "تتطلب السجلات غير المؤكدة ترحيل عملاتها بعد المراجعة قبل تعديل القيم المالية.",
+  "Export original records": "تصدير السجلات الأصلية",
+  "Rate provider": "مزود الأسعار",
+  "Print / Save PDF": "طباعة / حفظ PDF",
+  "Invoices recorded": "الفواتير المسجلة",
+});
 export const translations = { en: {}, ar };
 export function translate(language, key, values = {}) {
   if (key == null) return "";

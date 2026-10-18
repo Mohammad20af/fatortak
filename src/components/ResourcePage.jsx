@@ -13,6 +13,7 @@ import {
   PeriodFields,
 } from "./UI";
 import RecordForm from "./RecordForm";
+import { downloadCsv } from "../utils/export";
 export default function ResourcePage({
   title,
   singular,
@@ -25,7 +26,7 @@ export default function ResourcePage({
   categoryOptions,
   loadOptions,
 }) {
-  const { money, dateLabel } = useFormat();
+  const { recordMoney, dateLabel } = useFormat();
   const { t } = useI18n();
   const { currency } = useOutletContext();
   const [draftFilters, setDraftFilters] = useState({
@@ -43,15 +44,17 @@ export default function ResourcePage({
   const loader = useCallback(
     async (signal) => {
       const [records, options] = await Promise.all([
-        api.list(filters, signal),
+        api.listPage(filters, signal),
         loadOptions ? loadOptions(signal) : Promise.resolve({}),
       ]);
       return {
-        records,
+        records: records[dateFilters ? "expenses" : title.toLowerCase()],
+        count: records.count,
+        page: records.page,
         options,
       };
     },
-    [api, filters, loadOptions],
+    [api, filters, loadOptions, dateFilters, title],
   );
   const state = useLoad(loader);
   const formFields = fields.map((field) =>
@@ -127,17 +130,43 @@ export default function ResourcePage({
       setBusy(false);
     }
   }
+  async function exportRecords() {
+    setBusy(true);
+    try {
+      const records = await api.list({ ...filters, page: undefined });
+      downloadCsv(`fatortak-${title.toLowerCase().replaceAll(" ", "-")}.csv`, [
+        [...columns.map((column) => t(column.label)), t("Original currency")],
+        ...records.map((record) => [
+          ...columns.map((column) =>
+            column.party ? record[column.key]?.name || "" : record[column.key],
+          ),
+          record.currency || t("Currency unverified"),
+        ]),
+      ]);
+    } catch (error) {
+      setFeedback({ error });
+    } finally {
+      setBusy(false);
+    }
+  }
   function display(record, column) {
     const value = record[column.key];
-    if (column.money) return money(value, currency);
+    if (column.money) return recordMoney(record);
     if (column.date) return dateLabel(value);
     if (column.party) return value?.name || "—";
-    if (column.key === 'category' && categoryOptions) return t(value);
+    if (column.key === "category" && categoryOptions) return t(value);
     return value || "—";
   }
   return (
     <>
       <PageHeader title={title} description={description}>
+        <button
+          className="button secondary"
+          disabled={busy}
+          onClick={exportRecords}
+        >
+          {t("Export original records")}
+        </button>
         <button
           className="button"
           disabled={busy || state.loading || Boolean(state.error)}
@@ -146,6 +175,7 @@ export default function ResourcePage({
             setEditor({
               values: {
                 ...defaults,
+                ...(dateFilters && { currency }),
               },
             });
           }}
@@ -154,6 +184,13 @@ export default function ResourcePage({
         </button>
       </PageHeader>
       <Notice {...feedback} />
+      {dateFilters && (
+        <p className="field-help">
+          {t(
+            "Unverified records require a reviewed currency migration before editing financial values.",
+          )}
+        </p>
+      )}
       <div className="panel">
         <form
           className="filters"
@@ -230,7 +267,7 @@ export default function ResourcePage({
               <div className="section-heading">
                 <h2>{t(`All ${title.toLowerCase()}`)}</h2>
                 <span className="count">
-                  {t('{count} records', { count: state.data.records.length })}
+                  {t("{count} records", { count: state.data.count })}
                 </span>
               </div>
               {state.data.records.length ? (
@@ -264,7 +301,9 @@ export default function ResourcePage({
                                 {t("View")}
                               </button>
                               <button
-                                disabled={busy}
+                                disabled={
+                                  busy || (dateFilters && !record.currency)
+                                }
                                 onClick={() => openRecord(record, "edit")}
                               >
                                 {t("Edit")}
@@ -291,6 +330,27 @@ export default function ResourcePage({
                   {t("Add a record, or try changing your filters.")}
                 </Empty>
               )}
+              <div className="pagination">
+                <button
+                  className="button secondary"
+                  disabled={state.data.page <= 1}
+                  onClick={() =>
+                    setFilters({ ...filters, page: state.data.page - 1 })
+                  }
+                >
+                  {t("Previous")}
+                </button>
+                <span>{t("Page {page}", { page: state.data.page })}</span>
+                <button
+                  className="button secondary"
+                  disabled={state.data.page * 50 >= state.data.count}
+                  onClick={() =>
+                    setFilters({ ...filters, page: state.data.page + 1 })
+                  }
+                >
+                  {t("Next")}
+                </button>
+              </div>
             </>
           )}
         </LoadState>
@@ -302,7 +362,11 @@ export default function ResourcePage({
           busy={busy}
         >
           <RecordForm
-            fields={formFields}
+            fields={formFields.map((field) =>
+              field.name === "currency"
+                ? { ...field, disabled: Boolean(editor.id) }
+                : field,
+            )}
             initial={editor.values}
             onSave={save}
             onCancel={() => setEditor(null)}
@@ -317,7 +381,9 @@ export default function ResourcePage({
           busy={busy}
         >
           <p>
-            {t('“{name}” will be permanently deleted.', { name: deleting.name || deleting.title })}
+            {t("“{name}” will be permanently deleted.", {
+              name: deleting.name || deleting.title,
+            })}
           </p>
           <div className="form-actions">
             <button
@@ -341,12 +407,14 @@ export default function ResourcePage({
                 <dt>{t(field.label)}</dt>
                 <dd>
                   {field.type === "number"
-                    ? money(detail[field.name], currency)
+                    ? recordMoney(detail)
                     : field.type === "date"
                       ? dateLabel(detail[field.name])
                       : field.optionKey
                         ? detail[field.name]?.name || t("None")
-                        : field.name === 'category' && categoryOptions ? t(detail[field.name]) : detail[field.name] || "\u2014"}
+                        : field.name === "category" && categoryOptions
+                          ? t(detail[field.name])
+                          : detail[field.name] || "\u2014"}
                 </dd>
               </div>
             ))}

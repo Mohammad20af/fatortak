@@ -1,3 +1,7 @@
+# Earlier implementation history
+
+The entries below are historical. The current security/currency/UI upgrade and verification results are documented in [SECURITY_CURRENCY_UPGRADE.md](SECURITY_CURRENCY_UPGRADE.md).
+
 # Fatortak implementation changelog
 
 Implemented on September 7, 2026 in `C:\Users\ASUS\Desktop\fatortak-frontend`.

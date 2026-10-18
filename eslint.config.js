@@ -5,7 +5,12 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import { defineConfig, globalIgnores } from "eslint/config";
 
 export default defineConfig([
-  globalIgnores(["dist", "playwright-report", "test-results"]),
+  globalIgnores([
+    "dist",
+    "playwright-report",
+    "test-results",
+    ".implementation",
+  ]),
   {
     files: ["**/*.{js,jsx}"],
     extends: [
@@ -19,7 +24,12 @@ export default defineConfig([
     },
   },
   {
-    files: ["tests/**/*.js", "scripts/**/*.js", "*.config.js"],
+    files: [
+      "tests/**/*.js",
+      "test-unit/**/*.js",
+      "scripts/**/*.js",
+      "*.config.js",
+    ],
     languageOptions: { globals: globals.node },
   },
 ]);

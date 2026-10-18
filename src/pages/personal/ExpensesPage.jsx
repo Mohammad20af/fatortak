@@ -4,6 +4,12 @@ import { personalApi } from "../../api/personalApi";
 import { categories, today } from "../../utils/format";
 const fields = [
   {
+    name: "currency",
+    label: "Original currency",
+    options: ["USD", "ILS"],
+    required: true,
+  },
+  {
     name: "title",
     label: "Title",
     required: true,

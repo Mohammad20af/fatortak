@@ -1,3 +1,7 @@
+# Historical guide
+
+This guide describes the earlier implementation. Authentication, currency calculations, pagination and test setup have since changed. Read [SECURITY_CURRENCY_UPGRADE.md](SECURITY_CURRENCY_UPGRADE.md) and [README.md](README.md) for the current contracts and run instructions.
+
 # Understanding Fatortak
 
 ## 1. What Fatortak does

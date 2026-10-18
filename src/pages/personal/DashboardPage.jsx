@@ -6,6 +6,9 @@ import { personalApi } from "../../api/personalApi";
 import { useAuth } from "../../context/auth";
 import useLoad from "../../utils/useLoad";
 import { currentPeriod } from "../../utils/format";
+import { useCurrency } from "../../context/currency";
+import { ValuationNotice } from "../../components/CurrencyControls";
+import SpendingTrend from "../../components/SpendingTrend";
 import {
   CategoryBars,
   Empty,
@@ -15,7 +18,8 @@ import {
   StatCard,
 } from "../../components/UI";
 export default function DashboardPage() {
-  const { periodLabel, money, dateLabel } = useFormat();
+  const { periodLabel, money, recordMoney, dateLabel } = useFormat();
+  const { currency } = useCurrency();
   const { t } = useI18n();
   const { user } = useAuth();
   const [period, setPeriod] = useState(currentPeriod);
@@ -60,13 +64,13 @@ export default function DashboardPage() {
         <PeriodFields value={draft} onChange={setDraft} />
         <button className="button secondary">{t("View month")}</button>
         <span className="muted">
-          {t("Amounts in USD \xB7")}{' '}
-          {periodLabel(period)}
+          {currency} · {periodLabel(period)}
         </span>
       </form>
       <LoadState state={state}>
         {data && (
           <>
+            <ValuationNotice valuation={data.valuation} />
             <div className="stats-grid">
               <StatCard
                 label={t("Total expenses")}
@@ -92,7 +96,7 @@ export default function DashboardPage() {
               />
               <StatCard
                 label={t("Expenses recorded")}
-                value={state.data.expenses.length}
+                value={data.expenseCount}
                 hint={t("Every detail makes a difference")}
               />
             </div>
@@ -118,7 +122,11 @@ export default function DashboardPage() {
                     ? t(
                         "Set a monthly budget and see where you stand as you go.",
                       )
-                    : data.percentageUsed == null && data.isOverBudget ? t('You are over your budget') : t('{percent}% of your monthly budget used.', { percent: data.percentageUsed ?? 0 })}
+                    : data.percentageUsed == null && data.isOverBudget
+                      ? t("You are over your budget")
+                      : t("{percent}% of your monthly budget used.", {
+                          percent: data.percentageUsed ?? 0,
+                        })}
                 </p>
                 {data.budget != null && (
                   <progress
@@ -165,7 +173,7 @@ export default function DashboardPage() {
                           <td className="primary-cell">{expense.title}</td>
                           <td>{t(expense.category)}</td>
                           <td>{dateLabel(expense.date)}</td>
-                          <td>{money(expense.amount)}</td>
+                          <td>{recordMoney(expense)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -177,6 +185,7 @@ export default function DashboardPage() {
                 </Empty>
               )}
             </section>
+            <SpendingTrend items={data.trend} />
           </>
         )}
       </LoadState>

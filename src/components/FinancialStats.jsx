@@ -15,7 +15,12 @@ export default function FinancialStats({ data, currency }) {
         />
         <StatCard
           label={t("Total expenses")}
-          value={money(data.purchaseCost + data.operatingExpenses, currency)}
+          value={money(
+            data.purchaseCost === null || data.operatingExpenses === null
+              ? null
+              : Number((data.purchaseCost + data.operatingExpenses).toFixed(2)),
+            currency,
+          )}
           hint={t("Paid purchases + operating expenses")}
         />
         <StatCard

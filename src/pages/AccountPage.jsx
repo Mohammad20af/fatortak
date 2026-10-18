@@ -9,6 +9,8 @@ export default function AccountPage() {
   const [form, setForm] = useState({
     name: user.name,
     email: user.email,
+    currentPassword: "",
+    newPassword: "",
   });
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState({});
@@ -21,11 +23,16 @@ export default function AccountPage() {
         await authApi.update({
           name: form.name.trim(),
           email: form.email.trim(),
+          ...(form.currentPassword && {
+            currentPassword: form.currentPassword,
+          }),
+          ...(form.newPassword && { newPassword: form.newPassword }),
         }),
       );
       setFeedback({
         success: "Account details updated.",
       });
+      setForm({ ...form, currentPassword: "", newPassword: "" });
     } catch (err) {
       setFeedback({
         error: err,
@@ -70,7 +77,28 @@ export default function AccountPage() {
             />
             <p className="muted">
               {t("Account type:")}
-            {t(user.accountType)}
+              {t(user.accountType)}
+            </p>
+            <Field
+              label={t("Current password")}
+              type="password"
+              autoComplete="current-password"
+              value={form.currentPassword}
+              onChange={(value) => setForm({ ...form, currentPassword: value })}
+            />
+            <p className="field-help">
+              {t("Required when changing your email or password.")}
+            </p>
+            <Field
+              label={t("New password")}
+              type="password"
+              minLength={12}
+              autoComplete="new-password"
+              value={form.newPassword}
+              onChange={(value) => setForm({ ...form, newPassword: value })}
+            />
+            <p className="field-help">
+              {t("Use 12 or more characters, up to 72 UTF-8 bytes.")}
             </p>
             <button className="button">
               {busy ? t("Saving\u2026") : t("Save account")}

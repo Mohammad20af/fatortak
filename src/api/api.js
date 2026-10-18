@@ -1,33 +1,60 @@
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:3000/api"
 ).replace(/\/$/, "");
-const TOKEN_KEY = "fatortak.token";
-
-export const tokenStorage = {
-  get: () => localStorage.getItem(TOKEN_KEY),
-  set: (token) => localStorage.setItem(TOKEN_KEY, token),
-  clear: () => localStorage.removeItem(TOKEN_KEY),
+let csrfToken = null,
+  csrfPending = null,
+  displayCurrency = "USD",
+  sessionVersion = 0;
+export const setDisplayCurrency = (currency) => {
+  displayCurrency = currency;
 };
-
+export const clearCsrf = () => {
+  csrfToken = null;
+  sessionVersion++;
+};
+export async function initializeCsrf() {
+  if (!csrfPending)
+    csrfPending = fetch(`${API_URL}/auth/csrf`, {
+      credentials: "include",
+      signal: AbortSignal.timeout(15000),
+    })
+      .then(async (res) => {
+        if (!res.ok)
+          throw new Error(
+            "Cannot reach Fatortak. Check your connection and make sure the backend is running on port 3000.",
+          );
+        const data = await res.json();
+        csrfToken = data.csrfToken;
+        return data;
+      })
+      .finally(() => {
+        csrfPending = null;
+      });
+  return csrfPending;
+}
 export function queryString(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== "" && value != null),
   );
   return query.size ? `?${query}` : "";
 }
-
 export async function request(
   path,
-  { method = "GET", body, signal, authenticated = true } = {},
+  { method = "GET", body, signal, authenticated = true, csrfRetry = true } = {},
 ) {
-  const token = authenticated ? tokenStorage.get() : null;
+  if (method !== "GET" && !csrfToken) await initializeCsrf();
+  const requestVersion = sessionVersion;
+  const url = new URL(`${API_URL}${path}`, window.location.origin);
+  if (method === "GET" && !path.startsWith("/auth"))
+    url.searchParams.set("currency", displayCurrency);
   let response;
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    response = await fetch(url, {
       method,
+      credentials: "include",
       headers: {
         ...(body !== undefined && { "Content-Type": "application/json" }),
-        ...(token && { Authorization: `Bearer ${token}` }),
+        ...(method !== "GET" && { "X-CSRF-Token": csrfToken }),
       },
       ...(body !== undefined && { body: JSON.stringify(body) }),
       signal: signal
@@ -45,43 +72,57 @@ export async function request(
   }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const fallback = {
-      400: "Please check the entered information.",
-      401: "Please sign in again.",
-      403: "Your account cannot access this feature.",
-      404: "This record could not be found.",
-      409: "This record already exists.",
-    };
-    const details = Array.isArray(data.errors)
-      ? data.errors.join(". ")
-      : data.errors?.missingFields
-        ? `Required: ${data.errors.missingFields.join(", ")}`
-        : "";
+    // Only retry a rejected CSRF check: no controller has run at this point.
+    if (data.code === "CSRF_INVALID" && csrfRetry) {
+      await initializeCsrf();
+      return request(path, {
+        method,
+        body,
+        signal,
+        authenticated,
+        csrfRetry: false,
+      });
+    }
     const message =
       response.status >= 500
         ? "The server could not complete this request. Please try again."
-        : data.message || fallback[response.status] || "The request failed.";
-    const error = new Error([message, details].filter(Boolean).join(" "));
-    // Keep message parts so a visible error can switch languages without another request.
-    error.uiMessages = [
-      message,
-      ...(Array.isArray(data.errors) ? data.errors : details ? [details] : []),
-    ];
+        : data.message || "The request failed.";
+    const error = new Error(message);
+    error.uiMessages = [message];
     error.status = response.status;
-    // A rejected login must not expire a different, already active session.
-    if (response.status === 401 && token && token === tokenStorage.get())
+    if (
+      response.status === 401 &&
+      authenticated &&
+      requestVersion === sessionVersion
+    )
       window.dispatchEvent(new Event("fatortak:unauthorized"));
     throw error;
   }
+  if (data.csrfToken && data.csrfToken !== csrfToken) {
+    csrfToken = data.csrfToken;
+    sessionVersion++;
+  }
   return data;
 }
-
 export function resourceApi(path, plural, singular) {
   return {
-    list: (params, signal) =>
-      request(`${path}${queryString(params)}`, { signal }).then(
-        (data) => data[plural],
-      ),
+    listPage: (params, signal) =>
+      request(`${path}${queryString(params)}`, { signal }),
+    // Dropdowns retain all options; paginated tables use listPage directly.
+    list: async (params = {}, signal) => {
+      let page = 1,
+        records = [];
+      while (true) {
+        const data = await request(
+          `${path}${queryString({ ...params, page, limit: 100 })}`,
+          { signal },
+        );
+        records = records.concat(data[plural]);
+        if (records.length >= data.count || !data[plural].length)
+          return records;
+        page++;
+      }
+    },
     get: (id, signal) =>
       request(`${path}/${id}`, { signal }).then((data) => data[singular]),
     create: (body) => request(path, { method: "POST", body }),

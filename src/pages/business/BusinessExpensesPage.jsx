@@ -4,6 +4,12 @@ import { businessApi } from "../../api/businessApi";
 import { today } from "../../utils/format";
 const fields = [
   {
+    name: "currency",
+    label: "Original currency",
+    options: ["USD", "ILS"],
+    required: true,
+  },
+  {
     name: "title",
     label: "Title",
     required: true,

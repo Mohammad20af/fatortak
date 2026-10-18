@@ -6,6 +6,7 @@ import { useAuth } from "../../context/auth";
 import useLoad from "../../utils/useLoad";
 import { Badge, Empty, LoadState, PageHeader } from "../../components/UI";
 import FinancialStats from "../../components/FinancialStats";
+import { ValuationNotice } from "../../components/CurrencyControls";
 export default function DashboardPage() {
   const { periodLabel, money } = useFormat();
   const { t } = useI18n();
@@ -29,6 +30,7 @@ export default function DashboardPage() {
       <LoadState state={state}>
         {data && (
           <>
+            <ValuationNotice valuation={data.valuation} />
             <div className="period-caption">
               <span className="live-dot" />
               {periodLabel(data.period)}
@@ -79,6 +81,10 @@ export default function DashboardPage() {
               <section className="panel">
                 <h2>{t("Your business at a glance")}</h2>
                 <div className="business-counts">
+                  <Link to="/business/sales-invoices">
+                    <span>{t("Invoices recorded")}</span>
+                    <strong>{data.invoiceCount}</strong>
+                  </Link>
                   <Link to="/business/customers">
                     <span>{t("Customers")}</span>
                     <strong>{data.customers} →</strong>

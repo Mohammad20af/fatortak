@@ -5,7 +5,8 @@ import path from "node:path";
 
 test.describe.configure({ mode: "serial" });
 
-const api = "http://localhost:3000/api";
+const api = process.env.E2E_API_URL || "http://localhost:3107/api";
+const baseURL = process.env.E2E_BASE_URL || "http://localhost:5177";
 const password = "Fatortak-Test-Only-927!";
 const run = `fatortak-e2e-${Date.now()}`;
 const emails = {
@@ -21,11 +22,18 @@ test.afterAll(async () => {
   if (!createdUsers.length) return;
   const requireBackend = createRequire(path.join(backend, "package.json"));
   requireBackend("dotenv").config({
-    path: path.join(backend, ".env"),
+    path: path.join(backend, ".env.test-never-production"),
     quiet: true,
   });
   const mongoose = requireBackend("mongoose");
-  await mongoose.connect(process.env.MONGODB_URI);
+  const uri = process.env.TEST_MONGODB_URI;
+  if (
+    !/^mongodb:\/\/(?:127\.0\.0\.1|localhost):27028\/fatortak_test_[a-z0-9_]+$/.test(
+      uri || "",
+    )
+  )
+    throw new Error("Cleanup requires the isolated test database");
+  await mongoose.connect(uri);
   try {
     const User = (
       await import(pathToFileURL(path.join(backend, "models/User.js")).href)
@@ -43,6 +51,7 @@ test.afterAll(async () => {
         "Supplier",
         "BusinessExpense",
         "BusinessProfile",
+        "Session",
       ]) {
         const Model = (
           await import(
@@ -77,7 +86,7 @@ async function register(page, role) {
   expect(response.status()).toBe(201);
   const data = await response.json();
   createdUsers.push({ id: data.user.id, email: data.user.email });
-  await expect(page).toHaveURL(`http://localhost:5173/${role}/dashboard`);
+  await expect(page).toHaveURL(`${baseURL}/${role}/dashboard`);
   await expect(
     page.getByRole("heading", { name: "Hello, Test." }),
   ).toBeVisible();
@@ -87,7 +96,7 @@ async function login(page, role) {
   await page.getByLabel("Email address").fill(emails[role]);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in", exact: false }).click();
-  await expect(page).toHaveURL(`http://localhost:5173/${role}/dashboard`);
+  await expect(page).toHaveURL(`${baseURL}/${role}/dashboard`);
 }
 async function navigate(page, name) {
   await page
@@ -122,7 +131,9 @@ async function deleteRow(page, name) {
 }
 async function authHeaders(page) {
   return {
-    Authorization: `Bearer ${await page.evaluate(() => localStorage.getItem("fatortak.token"))}`,
+    Cookie: (await page.context().cookies())
+      .map((cookie) => `${cookie.name}=${cookie.value}`)
+      .join("; "),
   };
 }
 
@@ -241,7 +252,7 @@ test("business: profile, parties, both invoice types, expense CRUD and financial
   await navigate(page, "Business profile");
   await page.getByLabel("Business name").fill("Test Studio");
   await page.getByLabel("Business email").fill("studio@example.test");
-  await page.getByLabel("Currency code").fill("USD");
+  await page.getByLabel("Currency code").selectOption("USD");
   await page.getByRole("button", { name: "Save business profile" }).click();
   await expect(page.getByRole("status")).toContainText(
     "Business profile saved",
@@ -433,8 +444,10 @@ test("visible network/server errors, expired sessions, 404 and mobile authentica
   request,
 }) => {
   await login(page, "personal");
+  await expect(page.getByText("Total expenses", { exact: true })).toBeVisible();
+  await expect(page.locator(".rate-notice strong")).toBeVisible();
   await page.route("**/api/expenses/summary*", (route) => route.abort());
-  await page.reload();
+  await page.getByRole("button", { name: "View month", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Cannot reach Fatortak");
   await page.unroute("**/api/expenses/summary*");
   await page.getByRole("button", { name: "Try again" }).click();
@@ -455,18 +468,24 @@ test("visible network/server errors, expired sessions, 404 and mobile authentica
     );
     await page.unroute("**/api/expenses/summary*");
   }
-  await page.evaluate(() =>
-    localStorage.setItem("fatortak.token", "expired-test-token"),
+  await page.route("**/api/expenses/summary*", (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({ message: "Please sign in again." }),
+    }),
   );
   await page.reload();
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("status")).toContainText("Your session expired");
+  await page.unroute("**/api/expenses/summary*");
+  await page.context().clearCookies();
   expect((await request.get(`${api}/expenses`)).status()).toBe(401);
   expect(
     (
       await request.post(`${api}/auth/register`, { data: { email: "invalid" } })
     ).status(),
-  ).toBe(400);
+  ).toBe(403);
   await page.goto("/missing-page");
   await expect(page.getByRole("heading", { name: /This page/ })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });

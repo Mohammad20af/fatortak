@@ -15,6 +15,8 @@ import {
   PeriodFields,
 } from "../../components/UI";
 import InvoiceForm from "../../components/InvoiceForm";
+import { downloadCsv } from "../../utils/export";
+import { lineTotal } from "../../utils/money";
 const emptyFilters = {
   search: "",
   status: "",
@@ -24,7 +26,7 @@ const emptyFilters = {
   supplier: "",
 };
 export default function InvoicesPage({ type }) {
-  const { dateLabel, money } = useFormat();
+  const { dateLabel, money, recordMoney } = useFormat();
   const { t } = useI18n();
   const { currency } = useOutletContext();
   const [filters, setFilters] = useState({});
@@ -39,7 +41,7 @@ export default function InvoicesPage({ type }) {
     async (signal) => {
       // The common endpoint accepts an explicit type query and works with Express 5.
       const [invoices, customers, suppliers] = await Promise.all([
-        businessApi.invoices.list(
+        businessApi.invoices.listPage(
           {
             ...filters,
             type,
@@ -50,7 +52,9 @@ export default function InvoicesPage({ type }) {
         businessApi.suppliers.list({}, signal),
       ]);
       return {
-        invoices,
+        invoices: invoices.invoices,
+        count: invoices.count,
+        page: invoices.page,
         customers,
         suppliers,
       };
@@ -103,6 +107,38 @@ export default function InvoicesPage({ type }) {
       setBusy(false);
     }
   }
+  async function exportRecords() {
+    setBusy(true);
+    try {
+      const invoices = await businessApi.invoices.list({
+        ...filters,
+        type,
+        page: undefined,
+      });
+      downloadCsv(`fatortak-${type}-invoices.csv`, [
+        [
+          t("Invoice number"),
+          t("Title"),
+          t("Date"),
+          t("Status"),
+          t("Amount"),
+          t("Original currency"),
+        ],
+        ...invoices.map((invoice) => [
+          invoice.invoiceNumber,
+          invoice.title,
+          invoice.date,
+          t(invoice.status),
+          invoice.amount,
+          invoice.currency || t("Currency unverified"),
+        ]),
+      ]);
+    } catch (error) {
+      setFeedback({ error });
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <>
       <PageHeader
@@ -113,6 +149,13 @@ export default function InvoicesPage({ type }) {
             : t("Stay on top of your purchases and payments.")
         }
       >
+        <button
+          className="button secondary"
+          disabled={busy}
+          onClick={exportRecords}
+        >
+          {t("Export original records")}
+        </button>
         <button
           className="button"
           disabled={busy || state.loading || Boolean(state.error)}
@@ -127,6 +170,11 @@ export default function InvoicesPage({ type }) {
         </button>
       </PageHeader>
       <Notice {...feedback} />
+      <p className="field-help">
+        {t(
+          "Unverified records require a reviewed currency migration before editing financial values.",
+        )}
+      </p>
       <div className="panel">
         <form
           className="filters"
@@ -227,7 +275,7 @@ export default function InvoicesPage({ type }) {
               <div className="section-heading">
                 <h2>{t(`All ${title.toLowerCase()}`)}</h2>
                 <span className="count">
-                  {t('{count} invoices', { count: state.data.invoices.length })}
+                  {t("{count} invoices", { count: state.data.count })}
                 </span>
               </div>
               {state.data.invoices.length ? (
@@ -261,14 +309,13 @@ export default function InvoicesPage({ type }) {
                           <td>
                             {dateLabel(invoice.date)}
                             <small>
-                              {t("Due")}{' '}
-                              {dateLabel(invoice.dueDate)}
+                              {t("Due")} {dateLabel(invoice.dueDate)}
                             </small>
                           </td>
                           <td>
                             <Badge status={invoice.status} />
                           </td>
-                          <td>{money(invoice.amount, currency)}</td>
+                          <td>{recordMoney(invoice)}</td>
                           <td>
                             <div className="row-actions">
                               <button
@@ -278,7 +325,7 @@ export default function InvoicesPage({ type }) {
                                 {t("View")}
                               </button>
                               <button
-                                disabled={busy}
+                                disabled={busy || !invoice.currency}
                                 onClick={() => open(invoice, true)}
                               >
                                 {t("Edit")}
@@ -305,6 +352,27 @@ export default function InvoicesPage({ type }) {
                   {t("Create an invoice, or adjust your filters.")}
                 </Empty>
               )}
+              <div className="pagination">
+                <button
+                  className="button secondary"
+                  disabled={state.data.page <= 1}
+                  onClick={() =>
+                    setFilters({ ...filters, page: state.data.page - 1 })
+                  }
+                >
+                  {t("Previous")}
+                </button>
+                <span>{t("Page {page}", { page: state.data.page })}</span>
+                <button
+                  className="button secondary"
+                  disabled={state.data.page * 50 >= state.data.count}
+                  onClick={() =>
+                    setFilters({ ...filters, page: state.data.page + 1 })
+                  }
+                >
+                  {t("Next")}
+                </button>
+              </div>
             </>
           )}
         </LoadState>
@@ -333,7 +401,9 @@ export default function InvoicesPage({ type }) {
           onClose={() => setDeleting(null)}
         >
           <p>
-            {t('“{name}” will be permanently deleted.', { name: deleting.title })}
+            {t("“{name}” will be permanently deleted.", {
+              name: deleting.title,
+            })}
           </p>
           <div className="form-actions">
             <button
@@ -357,7 +427,7 @@ export default function InvoicesPage({ type }) {
           <div className="invoice-detail-heading">
             <div>
               <span className="eyebrow">
-                {t(`${detail.type || 'sales'} INVOICE`)}
+                {t(`${detail.type || "sales"} INVOICE`)}
               </span>
               <h2>{detail.title}</h2>
             </div>
@@ -386,7 +456,9 @@ export default function InvoicesPage({ type }) {
             </div>
             <div>
               <dt>{t("Category")}</dt>
-              <dd>{detail.category}</dd>
+              <dd>
+                {detail.category === "Other" ? t("Other") : detail.category}
+              </dd>
             </div>
           </dl>
           {Boolean(detail.items?.length) && (
@@ -405,8 +477,16 @@ export default function InvoicesPage({ type }) {
                     <tr key={index}>
                       <td>{item.description}</td>
                       <td>{item.quantity}</td>
-                      <td>{money(item.unitPrice, currency)}</td>
-                      <td>{money(item.quantity * item.unitPrice, currency)}</td>
+                      <td>
+                        {detail.currency
+                          ? money(item.unitPrice, detail.currency)
+                          : t("Currency unverified")}
+                      </td>
+                      <td>
+                        {detail.currency
+                          ? money(lineTotal([item]), detail.currency)
+                          : t("Currency unverified")}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -415,12 +495,20 @@ export default function InvoicesPage({ type }) {
           )}
           <div className="invoice-total">
             {t("Total")}
-            <strong>{money(detail.amount, currency)}</strong>
+            <strong className="screen-only">{recordMoney(detail)}</strong>
+            <strong className="print-only">
+              {detail.currency
+                ? money(detail.amount, detail.currency)
+                : recordMoney(detail)}
+            </strong>
           </div>
           <p className="preserve-lines">
             {detail.notes || t("No additional notes.")}
           </p>
           <div className="form-actions">
+            <button className="button secondary" onClick={() => window.print()}>
+              {t("Print / Save PDF")}
+            </button>
             <button
               className="button secondary"
               onClick={() => setDetail(null)}

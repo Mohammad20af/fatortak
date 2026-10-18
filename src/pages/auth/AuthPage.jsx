@@ -4,7 +4,8 @@ import { Link, Navigate } from "react-router-dom";
 import { authApi } from "../../api/authApi";
 import { dashboardPath, useAuth } from "../../context/auth";
 import { Field, Loading, Notice } from "../../components/UI";
-import LanguageSwitcher from '../../i18n/LanguageSwitcher';
+import LanguageSwitcher from "../../i18n/LanguageSwitcher";
+import ThemeToggle from "../../components/ThemeToggle";
 export default function AuthPage({ register = false }) {
   const { t } = useI18n();
   const auth = useAuth();
@@ -84,7 +85,10 @@ export default function AuthPage({ register = false }) {
         <small>{t("Personal finances. Business confidence.")}</small>
       </section>
       <section className="auth-form-wrap">
-        <nav className="auth-language" aria-label={t('Language')}><LanguageSwitcher /></nav>
+        <nav className="auth-language" aria-label={t("Language")}>
+          <ThemeToggle />
+          <LanguageSwitcher />
+        </nav>
         <div className="auth-form">
           <span className="pill">{t("WELCOME TO FATORTAK")}</span>
           <h2>
@@ -151,7 +155,7 @@ export default function AuthPage({ register = false }) {
                 value={form.password}
                 onChange={update("password")}
                 required
-                minLength={register ? 8 : undefined}
+                minLength={register ? 12 : undefined}
                 autoComplete={register ? "new-password" : "current-password"}
               />
               {register && (

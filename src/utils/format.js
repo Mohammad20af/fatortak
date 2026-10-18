@@ -8,10 +8,13 @@ export const categories = [
   "Education",
   "Other",
 ];
-export const today = () => new Date().toISOString().slice(0, 10);
+export const today = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+};
 export const currentPeriod = () => ({
-  month: String(new Date().getUTCMonth() + 1),
-  year: String(new Date().getUTCFullYear()),
+  month: String(new Date().getMonth() + 1),
+  year: String(new Date().getFullYear()),
 });
 export const dateInput = (value) => (value ? value.slice(0, 10) : "");
 export const dateLabel = (value, locale = "en") =>

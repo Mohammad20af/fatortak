@@ -20,19 +20,23 @@ Frontend `.env` contains only `VITE_API_URL=http://localhost:3000/api`; copy `.e
 
 ## Checks
 
+See [SECURITY_CURRENCY_UPGRADE.md](SECURITY_CURRENCY_UPGRADE.md) for the current authentication/currency contract, migrations, changed files and verification report.
+
 ```powershell
 npm run lint
 npm run build
+npm run test:unit
 npm run test:e2e
 ```
 
-Browser tests require both servers running, the configured backend database, and Google Chrome. They create unique `@example.test` accounts and remove only those exact accounts and related records afterward. Cleanup imports existing backend models; set `FATORTAK_BACKEND_PATH` if your backend moved. Run the full suite because tests share temporary accounts. Results are in `playwright-report/`; screenshots are in `test-results/`.
+Browser tests use isolated ports 5177/3107 and require Google Chrome plus a separate MongoDB on port 27028. They never default to your application database. See the upgrade report for exact setup commands. Set `TEST_MONGODB_URI` to an isolated `fatortak_test_*` database before running the full suite; legacy test cleanup checks this connection and removes only accounts created by that run. `E2E_BASE_URL`, `E2E_API_URL` and `FATORTAK_BACKEND_PATH` can override their locations. Results are in `playwright-report/`; screenshots and invoice PDF samples are in `test-results/`.
 
 `npm run format` formats code and docs. `npm run preview` serves the production build locally. A deployed static host must rewrite application URLs to `index.html`.
 
 ## Documentation
 
-- [PROJECT_EXPLANATION.md](PROJECT_EXPLANATION.md): student guide, architecture, file explanations, full endpoint map and presentation notes.
-- [CHANGELOG_IMPLEMENTATION.md](CHANGELOG_IMPLEMENTATION.md): file changes, reasons and verification.
+- [SECURITY_CURRENCY_UPGRADE.md](SECURITY_CURRENCY_UPGRADE.md): current implementation and operating instructions.
+- [PROJECT_EXPLANATION.md](PROJECT_EXPLANATION.md): historical student guide.
+- [CHANGELOG_IMPLEMENTATION.md](CHANGELOG_IMPLEMENTATION.md): earlier implementation history.
 
-Backend source was preserved. Invoice lists use `/api/invoices?type=sales` or `?type=purchase`, avoiding the existing Express 5 shortcut-route filtering issue.
+Both original repositories and account types are preserved. Authentication uses revocable HttpOnly cookies with CSRF protection; no access or refresh tokens are kept in browser storage. Header currency changes persist in the user profile and convert displays without relabeling original records. New records require ILS or USD; old records need evidence before assigning a currency. Tables paginate, exports preserve original currencies, and invoice details support Arabic/English printing and browser Save as PDF.

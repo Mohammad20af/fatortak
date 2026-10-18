@@ -3,11 +3,12 @@ import { useI18n } from "../i18n/context";
 import { useState } from "react";
 import { dateInput, today } from "../utils/format";
 import { Field, Notice } from "./UI";
+import { lineTotal } from "../utils/money";
 export default function InvoiceForm({
   invoice,
   type,
-  customers,
-  suppliers,
+  customers = [],
+  suppliers = [],
   currency,
   onSave,
   onCancel,
@@ -17,6 +18,7 @@ export default function InvoiceForm({
   const { t } = useI18n();
   const [form, setForm] = useState({
     invoiceNumber: invoice?.invoiceNumber || "",
+    currency: invoice?.currency || currency,
     title: invoice?.title || "",
     amount: invoice?.amount ?? "",
     category: invoice?.category || "Other",
@@ -40,10 +42,7 @@ export default function InvoiceForm({
       ...form,
       [key]: value,
     });
-  const itemTotal = items.reduce(
-    (total, item) => total + Number(item.quantity) * Number(item.unitPrice),
-    0,
-  );
+  const itemTotal = lineTotal(items);
   function updateItem(index, key, value) {
     setItems(
       items.map((item, position) =>
@@ -105,6 +104,13 @@ export default function InvoiceForm({
       <fieldset disabled={busy}>
         <div className="form-grid">
           <Field
+            label={t("Original currency")}
+            options={["USD", "ILS"]}
+            value={form.currency}
+            disabled={Boolean(invoice)}
+            onChange={update("currency")}
+          />
+          <Field
             label={t("Title")}
             required
             maxLength={150}
@@ -149,7 +155,7 @@ export default function InvoiceForm({
           />
           <Field
             label={t("Category")}
-            value={form.category}
+            value={form.category === "Other" ? t("Other") : form.category}
             onChange={update("category")}
           />
           <Field
@@ -221,7 +227,7 @@ export default function InvoiceForm({
               type="number"
               required
               min="0"
-              step="any"
+              step="0.001"
               value={item.quantity}
               onChange={(value) => updateItem(index, "quantity", value)}
             />
@@ -253,12 +259,12 @@ export default function InvoiceForm({
         {items.length ? (
           <div className="invoice-total">
             {t("Total")}
-            <strong>{money(itemTotal, currency)}</strong>
+            <strong>{money(itemTotal, form.currency)}</strong>
           </div>
         ) : (
           <Field
             label={t("Amount ({currency})", {
-              currency: currency,
+              currency: form.currency,
             })}
             type="number"
             min="0"
